@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quicksort Visualizer</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+    #container { width: 700px; margin: 30px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #aaa; padding: 20px; }
+    #controls { margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+    #canvas { background: #222; display: block; margin: 0 auto; border-radius: 4px; }
+    label { font-size: 1rem; }
+    button, input[type=range] { font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h2>Quicksort Visualizer</h2>
+    <div id="controls">
+      <button id="startBtn">Start</button>
+      <button id="pauseBtn">Pause</button>
+      <button id="resetBtn">Reset</button>
+      <label for="speed">Speed:</label>
+      <input type="range" id="speed" min="1" max="100" value="30" />
+    </div>
+    <canvas id="canvas" width="650" height="400"></canvas>
+    <p>
+      <span style="color:#2196f3;">■</span> Normal
+      <span style="color:#f44336;">■</span> Pivot
+      <span style="color:#ff9800;">■</span> Compared
+      <span style="color:#4caf50;">■</span> Sorted
+    </p>
+  </div>
+  <script>
+    const ARRAY_SIZE = 50;
+    const BAR_WIDTH = 12;
+    const PANEL_HEIGHT = 400;
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let array = [];
+    let states = [];
+    let running = false;
+    let paused = false;
+    let speed = 30;
+    let sortPromise = null;
+
+    function resetArray() {
+      array = [];
+      states = [];
+      for (let i = 0; i < ARRAY_SIZE; i++) {
+        array[i] = Math.floor(Math.random() * (PANEL_HEIGHT - 40)) + 20;
+        states[i] = 0;
+      }
+      drawArray();
+      running = false;
+      paused = false;
+      document.getElementById('pauseBtn').textContent = 'Pause';
+    }
+
+    function drawArray() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < ARRAY_SIZE; i++) {
+        switch (states[i]) {
+          case 1: ctx.fillStyle = '#f44336'; break; // Pivot (red)
+          case 2: ctx.fillStyle = '#ff9800'; break; // Compared (orange)
+          case 3: ctx.fillStyle = '#4caf50'; break; // Sorted (green)
+          default: ctx.fillStyle = '#2196f3'; break; // Normal (blue)
+        }
+        ctx.fillRect(20 + i * BAR_WIDTH, PANEL_HEIGHT - array[i], BAR_WIDTH - 2, array[i]);
+      }
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function quicksort(low, high) {
+      if (!running) return;
+      if (low < high) {
+        let pi = await partition(low, high);
+        await quicksort(low, pi - 1);
+        await quicksort(pi + 1, high);
+      }
+    }
+
+    async function partition(low, high) {
+      let pivot = array[high];
+      states[high] = 1;
+      drawArray();
+      let i = low - 1;
+      for (let j = low; j < high; j++) {
+        states[j] = 2;
+        drawArray();
+        await waitIfPaused();
+        await sleep(110 - speed);
+        if (array[j] < pivot) {
+          i++;
+          swap(i, j);
+          drawArray();
+          await sleep(110 - speed);
+        }
+        states[j] = 0;
+      }
+      swap(i + 1, high);
+      states[high] = 0;
+      drawArray();
+      await sleep(110 - speed);
+      return i + 1;
+    }
+
+    function swap(i, j) {
+      let temp = array[i];
+      array[i] = array[j];
+      array[j] = temp;
+    }
+
+    async function waitIfPaused() {
+      while (paused) {
+        await sleep(50);
+      }
+    }
+
+    async function startSort() {
+      if (running) return;
+      running = true;
+      paused = false;
+      sortPromise = (async () => {
+        await quicksort(0, array.length - 1);
+        for (let i = 0; i < ARRAY_SIZE; i++) states[i] = 3;
+        drawArray();
+        running = false;
+      })();
+    }
+
+    function togglePause() {
+      if (!running) return;
+      paused = !paused;
+      document.getElementById('pauseBtn').textContent = paused ? 'Resume' : 'Pause';
+    }
+
+    document.getElementById('startBtn').onclick = startSort;
+    document.getElementById('pauseBtn').onclick = togglePause;
+    document.getElementById('resetBtn').onclick = resetArray;
+    document.getElementById('speed').oninput = function(e) {
+      speed = +e.target.value;
+    };
+
+    resetArray();
+  </script>
+</body>
+</html>
